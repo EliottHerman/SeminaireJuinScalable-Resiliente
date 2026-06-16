@@ -1,0 +1,18 @@
+services:
+  api:
+    build: ./api-backend
+    container_name: ecommerce-api
+    environment:
+      - PORT=${API_INTERNAL_PORT}
+    ports:
+      - "${API_EXTERNAL_PORT}:${API_INTERNAL_PORT}"
+
+  frontend:
+    build: ./frontend
+    container_name: ecommerce-frontend
+    environment:
+      - API_URL=${API_URL}
+    ports:
+      - "${FRONT_EXTERNAL_PORT}:${FRONT_INTERNAL_PORT}"
+    depends_on:
+      - api

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Mini E-commerce</title>
+
+  <script src="config.js"></script>
+  
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f4f4f4;
+      color: #222;
+    }
+
+    header {
+      background: #111;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 30px auto;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 30px;
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    .products {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 20px;
+    }
+
+    .card,
+    .cart,
+    .orders {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .price {
+      font-weight: bold;
+      font-size: 18px;
+      margin: 10px 0;
+    }
+
+    .stock {
+      color: #666;
+      font-size: 14px;
+    }
+
+    button {
+      border: none;
+      background: #111;
+      color: white;
+      padding: 10px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background: #333;
+    }
+
+    button.danger {
+      background: #c0392b;
+    }
+
+    button.success {
+      background: #27ae60;
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    input {
+      width: 60px;
+      padding: 8px;
+      margin-top: 10px;
+    }
+
+    .cart-item {
+      border-bottom: 1px solid #ddd;
+      padding: 10px 0;
+    }
+
+    .cart-item:last-child {
+      border-bottom: none;
+    }
+
+    .total {
+      font-size: 20px;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+
+    .message {
+      margin: 20px auto;
+      max-width: 1100px;
+      padding: 15px 20px;
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .error {
+      background: #ffebee;
+      color: #c62828;
+    }
+
+    @media (max-width: 800px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Mini E-commerce</h1>
+  </header>
+
+  <div id="message" class="message"></div>
+
+  <main>
+    <section>
+      <h2>Produits</h2>
+      <div id="products" class="products"></div>
+    </section>
+
+    <aside>
+      <section class="cart">
+        <h2>Panier</h2>
+        <div id="cart"></div>
+        <button class="success" onclick="createOrder()">Commander</button>
+      </section>
+
+      <section class="orders" style="margin-top: 20px;">
+        <h2>Commandes</h2>
+        <div id="orders"></div>
+      </section>
+    </aside>
+  </main>
+
+  <script>
+    const API_URL = window.APP_CONFIG.API_URL;
+    const USER_ID = "user-1";
+
+    const productsContainer = document.getElementById("products");
+    const cartContainer = document.getElementById("cart");
+    const ordersContainer = document.getElementById("orders");
+    const messageBox = document.getElementById("message");
+
+    function showMessage(text, isError = false) {
+      messageBox.textContent = text;
+      messageBox.className = isError ? "message error" : "message";
+      messageBox.style.display = "block";
+
+      setTimeout(() => {
+        messageBox.style.display = "none";
+      }, 3000);
+    }
+
+    async function fetchProducts() {
+      try {
+        const response = await fetch(`${API_URL}/products`);
+        const products = await response.json();
+
+        productsContainer.innerHTML = "";
+
+        products.forEach(product => {
+          const card = document.createElement("div");
+          card.className = "card";
+
+          card.innerHTML = `
+            <h3>${product.name}</h3>
+            <p>Catégorie : ${product.category}</p>
+            <p class="price">${product.price.toFixed(2)} €</p>
+            <p class="stock">Stock : ${product.stock}</p>
+
+            <input 
+              type="number" 
+              min="1" 
+              value="1" 
+              id="quantity-${product.id}" 
+            />
+
+            <br />
+
+            <button onclick="addToCart(${product.id})">
+              Ajouter au panier
+            </button>
+          `;
+
+          productsContainer.appendChild(card);
+        });
+      } catch (error) {
+        showMessage("Erreur lors du chargement des produits", true);
+      }
+    }
+
+    async function addToCart(productId) {
+      const quantityInput = document.getElementById(`quantity-${productId}`);
+      const quantity = Number(quantityInput.value);
+
+      if (quantity <= 0) {
+        showMessage("La quantité doit être supérieure à 0", true);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/cart/${USER_ID}/add`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            productId,
+            quantity
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showMessage(data.error || "Erreur lors de l'ajout au panier", true);
+          return;
+        }
+
+        showMessage("Produit ajouté au panier");
+        fetchCart();
+      } catch (error) {
+        showMessage("Impossible d'ajouter le produit au panier", true);
+      }
+    }
+
+    async function fetchCart() {
+      try {
+        const response = await fetch(`${API_URL}/cart/${USER_ID}`);
+        const cart = await response.json();
+
+        cartContainer.innerHTML = "";
+
+        if (cart.items.length === 0) {
+          cartContainer.innerHTML = "<p>Votre panier est vide.</p>";
+          return;
+        }
+
+        cart.items.forEach(item => {
+          const div = document.createElement("div");
+          div.className = "cart-item";
+
+          div.innerHTML = `
+            <strong>${item.name}</strong>
+            <p>Prix unitaire : ${item.unitPrice.toFixed(2)} €</p>
+            <p>Quantité : ${item.quantity}</p>
+            <p>Total : ${item.total.toFixed(2)} €</p>
+          `;
+
+          cartContainer.appendChild(div);
+        });
+
+        const total = document.createElement("p");
+        total.className = "total";
+        total.textContent = `Total : ${cart.total.toFixed(2)} €`;
+
+        cartContainer.appendChild(total);
+      } catch (error) {
+        showMessage("Erreur lors du chargement du panier", true);
+      }
+    }
+
+    async function createOrder() {
+      try {
+        const response = await fetch(`${API_URL}/orders/${USER_ID}`, {
+          method: "POST"
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showMessage(data.error || "Erreur lors de la commande", true);
+          return;
+        }
+
+        showMessage("Commande créée avec succès");
+
+        fetchProducts();
+        fetchCart();
+        fetchOrders();
+      } catch (error) {
+        showMessage("Impossible de créer la commande", true);
+      }
+    }
+
+    async function fetchOrders() {
+      try {
+        const response = await fetch(`${API_URL}/orders/user/${USER_ID}`);
+        const orders = await response.json();
+
+        ordersContainer.innerHTML = "";
+
+        if (orders.length === 0) {
+          ordersContainer.innerHTML = "<p>Aucune commande.</p>";
+          return;
+        }
+
+        orders.forEach(order => {
+          const div = document.createElement("div");
+          div.className = "cart-item";
+
+          div.innerHTML = `
+            <div class="cart-item">
+              <strong>Commande #${order.id}</strong>
+              <p>Status : ${order.status}</p>
+              <p>Total : ${order.total.toFixed(2)} €</p>
+              <p>Date : ${new Date(order.createdAt).toLocaleString()}</p>
+            </div>
+          `;
+
+          ordersContainer.appendChild(div);
+        });
+      } catch (error) {
+        showMessage("Erreur lors du chargement des commandes", true);
+      }
+    }
+
+    fetchProducts();
+    fetchCart();
+    fetchOrders();
+  </script>
+</body>
+</html>
