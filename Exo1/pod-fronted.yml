@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: frontend-pod
+  labels:
+    app: frontend
+spec:
+  containers:
+    - name: frontend
+      image: ecommerce-frontend:latest
+      imagePullPolicy: Never
+      ports:
+        - containerPort: 5173
+      env:
+        - name: API_URL
+          value: "http://192.168.0.29:3001"
